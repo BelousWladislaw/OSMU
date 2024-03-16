@@ -12,16 +12,6 @@ config.hostmanager.enabled = true
     vm1.vm.hostname = "vm1"
     vm1.vm.network "private_network", ip: "192.168.33.10"
 
-    vm1.vm.provision "shell", inline: <<-SHELL
-      sudo apt-get update
-      sudo apt-get install -y git
-      git config --global user.name "BelousWladislaw"
-      git config --global user.email "wwwwladikby059@gmail.com"
-
-      git clone -b Module2 https://github.com/BelousWladislaw/OSMU
-
-      cat OSMU/module2.txt
-    SHELL
   end
 
   # VM 2
@@ -36,9 +26,9 @@ config.hostmanager.enabled = true
       git config --global user.name "BelousWladislaw"
       git config --global user.email "wwwwladikby059@gmail.com"
 
-      git clone -b Module2 https://github.com/BelousWladislaw/OSMU
+      git clone https://github.com/BelousWladislaw/OSMU
 
-      cat OSMU/module2.txt
+      cat OSMU/lab_1/task_1/git/module2.txt
     SHELL
   end
 end
