@@ -1,0 +1,100 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  # Создание reverse-proxy VM
+  config.vm.define "reverse-proxy" do |proxy|
+    proxy.vm.box = "ubuntu/bionic64"
+    proxy.vm.network "public_network", bridge: "en0: Wi-Fi (AirPort)"
+    proxy.vm.network "private_network", ip: "192.168.33.10"
+    proxy.vm.provider "virtualbox" do |vb|
+      vb.name = "reverse-proxy"
+      vb.memory = 1024
+    end
+    # Установка и настройка Nginx в качестве reverse proxy
+    proxy.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y nginx
+      rm /etc/nginx/sites-enabled/default
+      cp /vagrant/nginx-reverse-proxy.conf /etc/nginx/conf.d/reverse-proxy.conf
+      service nginx restart
+    SHELL
+  end
+
+  # Создание frontend VM
+  config.vm.define "frontend" do |frontend|
+    frontend.vm.box = "ubuntu/bionic64"
+    frontend.vm.network "private_network", ip: "192.168.33.11"
+    frontend.vm.provider "virtualbox" do |vb|
+      vb.name = "frontend"
+      vb.memory = 2048
+    end
+    frontend.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y nginx nodejs npm
+      cp /vagrant/nginx-frontend.conf /etc/nginx/sites-available/frontend
+      ln -s /etc/nginx/sites-available/frontend /etc/nginx/sites-enabled/
+      service nginx restart
+      git clone https://github.com/BelousWladislaw/devops-training-project-frontend-master /vagrant/frontend
+      cd /vagrant/frontend
+      npm install
+    SHELL
+  end
+
+  # Создание backend VM
+  config.vm.define "backend" do |backend|
+    backend.vm.box = "ubuntu/bionic64"
+    backend.vm.network "private_network", ip: "192.168.33.12"
+    backend.vm.provider "virtualbox" do |vb|
+      vb.name = "backend"
+      vb.memory = 2048
+    end
+    backend.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      apt-get install -y openjdk-8-jdk
+      git clone https://github.com/BelousWladislaw/devops-training-project-backend-master /vagrant/backend
+      cd /vagrant/backend
+      # Настройка файла .env
+      echo "ENV_VARIABLE=value" > .env
+    SHELL
+    backend.vm.provision "shell", inline: <<-SHELL
+      cat > /etc/systemd/system/backend.service << EOF
+[Unit]
+Description=Backend Service
+After=network.target
+
+[Service]
+User=vagrant
+WorkingDirectory=/vagrant/backend
+ExecStart=/usr/bin/java -jar app.jar
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=backend
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    SHELL
+    backend.vm.provision "shell", inline: <<-SHELL
+      systemctl enable backend.service
+      systemctl start backend.service
+    SHELL
+  end
+
+  # Создание db VM
+  config.vm.define "db" do |db|
+    db.vm.box = "ubuntu/bionic64"
+    db.vm.network "private_network", ip: "192.168.33.13"
+    db.vm.provider "virtualbox" do |vb|
+      vb.name = "db"
+      vb.memory = 2048
+    end
+    db.vm.provision "shell", inline: <<-SHELL
+      apt-get update
+      debconf-set-selections <<< "mysql-server mysql-server/root_password password secret"
+      debconf-set-selections <<< "mysql-server mysql-server/root_password_again password secret"
+      apt-get install -y mysql-server-5.7
+    SHELL
+  end
+end
